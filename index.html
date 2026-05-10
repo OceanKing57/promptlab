@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PromptLab - AI提示词实验室</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:#0a0a0f;color:#e0e0e0;min-height:100vh}
+.header{background:#12121a;border-bottom:1px solid #1e1e2e;padding:16px 24px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100}
+.header h1{font-size:20px;background:linear-gradient(135deg,#7c3aed,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.container{max-width:900px;margin:0 auto;padding:24px}
+.search-bar{width:100%;padding:14px 18px;border-radius:10px;border:2px solid #1e1e2e;background:#12121a;color:#fff;font-size:16px;margin-bottom:20px;outline:none}
+.search-bar:focus{border-color:#7c3aed}
+.tags{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.tag{padding:6px 14px;border-radius:20px;font-size:13px;cursor:pointer;border:1px solid #2a2a3e;background:transparent;color:#aaa;transition:all .2s}
+.tag:hover,.tag.active{background:rgba(124,58,237,0.2);border-color:#7c3aed;color:#a78bfa}
+.prompts{display:grid;gap:16px}
+.prompt-card{background:#12121a;border:1px solid #1e1e2e;border-radius:12px;padding:20px;transition:border .2s}
+.prompt-card:hover{border-color:#7c3aed}
+.prompt-card h3{font-size:16px;color:#fff;margin-bottom:4px}
+.prompt-card .meta{font-size:12px;color:#666;margin-bottom:10px}
+.prompt-card .preview{background:#0a0a0f;border-radius:8px;padding:12px;font-size:13px;color:#aaa;font-family:monospace;white-space:pre-wrap;max-height:100px;overflow:hidden;position:relative}
+.prompt-card .preview::after{content:'';position:absolute;bottom:0;left:0;right:0;height:30px;background:linear-gradient(transparent,#0a0a0f)}
+.copy-btn{margin-top:10px;padding:8px 16px;border-radius:8px;border:none;background:#7c3aed;color:#fff;cursor:pointer;font-size:13px}
+.copy-btn:hover{background:#6d28d9}
+.footer{text-align:center;padding:40px;color:#666;font-size:13px}
+.footer a{color:#a78bfa}
+@media(max-width:600px){.container{padding:16px}}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>⚡ PromptLab</h1>
+  <span style="color:#666;font-size:13px">AI提示词实验室</span>
+</div>
+
+<div class="container">
+  <input class="search-bar" placeholder="搜索提示词...（如：代码审查、SQL优化、重构）" oninput="filter()" id="search">
+
+  <div class="tags" id="tags"></div>
+  <div class="prompts" id="prompts"></div>
+</div>
+
+<div class="footer">
+  <p>🚀 <a href="https://github.com/OceanKing57/promptlab" target="_blank">GitHub</a> · 提示词持续更新</p>
+  <p style="margin-top:8px">💡 想要完整工具包？<a href="https://oceanking57.github.io/ai-coder-toolkit/" target="_blank">AI程序员效率宝典 ¥19.9</a></p>
+</div>
+
+<script>
+const prompts = [
+  {title:"代码审查 - 全面检查",cat:"代码审查",tags:["审查","PR"],text:"你是资深软件工程师。审查以下代码：\n1. 架构设计问题\n2. 潜在Bug\n3. 性能瓶颈\n4. 安全隐患\n5. 可读性\n给出修改建议和代码示例。"},
+  {title:"安全审查",cat:"代码审查",tags:["审查","安全"],text:"你是安全专家。审查以下代码的安全问题：\n- SQL注入\n- XSS\n- CSRF\n- 敏感信息泄露\n- 权限缺失\n标注风险等级并给出修复方案。"},
+  {title:"Bug根因分析",cat:"调试",tags:["调试","Bug"],text:"遇到Bug。错误信息：{error}\n相关代码：{code}\n预期行为：{expected}\n实际行为：{actual}\n分析根因，给出排查步骤和修复方案。"},
+  {title:"日志异常分析",cat:"调试",tags:["调试","日志"],text:"分析以下日志，找出异常模式、出现规律、关联请求和触发条件。\n{logs}"},
+  {title:"性能优化 - SQL",cat:"调试",tags:["SQL","性能"],text:"分析以下SQL的性能问题：索引缺失、全表扫描、子查询优化。给出优化后SQL和预期提升。\n{sql}"},
+  {title:"函数拆分重构",cat:"重构",tags:["重构"],text:"将以下长函数拆分为职责单一的小函数（≤30行）。保持逻辑不变，添加类型注解。\n{code}"},
+  {title:"异步改造",cat:"重构",tags:["重构","异步"],text:"将同步代码改为async/await。标注可并行操作。\n{code}"},
+  {title:"JS转TS",cat:"重构",tags:["重构","TypeScript"],text:"将JavaScript代码转为TypeScript，添加完整类型定义。\n{code}"},
+  {title:"生成API文档",cat:"文档",tags:["文档","API"],text:"根据以下代码生成OpenAPI 3.0规范文档（YAML格式）。\n{code}"},
+  {title:"生成函数注释",cat:"文档",tags:["文档","注释"],text:"为每个函数生成文档注释：功能、参数、返回值、示例。中文。\n{code}"},
+  {title:"生成CHANGELOG",cat:"文档",tags:["文档","发版"],text:"根据git提交记录，按Keep a Changelog格式生成版本日志。\n{git log}"},
+  {title:"生成单元测试",cat:"测试",tags:["测试"],text:"为以下代码生成完整的单元测试，覆盖正常/边界/异常情况。用pytest。\n{code}"},
+  {title:"Dockerfile生成",cat:"DevOps",tags:["Docker","部署"],text:"为以下项目生成多阶段Dockerfile。优化镜像大小和构建速度。\n{项目描述}"},
+  {title:"CI/CD配置",cat:"DevOps",tags:["CI/CD","GitHub"],text:"生成GitHub Actions配置：lint → test → build → deploy。\n{需求}"},
+  {title:"正则表达式生成",cat:"工具",tags:["正则"],text:"写一个正则表达式匹配{描述}。给出解释和测试用例。"},
+  {title:"技术方案设计",cat:"架构",tags:["架构","设计"],text:"设计{功能}的技术方案。包含：架构图描述、数据流、模块划分、技术选型、风险点。"},
+  {title:"API接口设计",cat:"架构",tags:["API","REST"],text:"设计{功能}的REST API。包含：端点、请求/响应格式、错误码、认证方式。"},
+  {title:"数据库表设计",cat:"架构",tags:["数据库","SQL"],text:"设计{业务}的数据库表结构。包含字段类型、索引、外键关系、建表SQL。"},
+  {title:"面试算法题",cat:"面试",tags:["面试","算法"],text:"用{语言}实现{题目}。给出思路分析、时间复杂度、完整代码。"},
+  {title:"系统设计面试",cat:"面试",tags:["面试","系统设计"],text:"设计{系统}。给出：需求分析、容量估算、架构图、数据存储、API设计、扩展方案。"}
+];
+
+const allCats = [...new Set(prompts.map(p=>p.cat))];
+let activeCat = '';
+
+function renderTags(){
+  const tagsEl = document.getElementById('tags');
+  tagsEl.innerHTML = '<span class="tag'+(activeCat?'':' active')+'" onclick="setCat(\'\')">全部</span>';
+  allCats.forEach(cat => {
+    tagsEl.innerHTML += '<span class="tag'+(activeCat===cat?' active':'')+'" onclick="setCat(\''+cat+'\')">'+cat+'</span>';
+  });
+}
+
+function setCat(cat){activeCat=cat;renderTags();filter();}
+
+function filter(){
+  const q = document.getElementById('search').value.toLowerCase();
+  const filtered = prompts.filter(p => {
+    if(activeCat && p.cat !== activeCat) return false;
+    if(!q) return true;
+    return p.title.toLowerCase().includes(q) || p.cat.toLowerCase().includes(q) || p.tags.some(t=>t.toLowerCase().includes(q)) || p.text.toLowerCase().includes(q);
+  });
+  render(filtered);
+}
+
+function render(list){
+  document.getElementById('prompts').innerHTML = list.map((p,i) => `
+    <div class="prompt-card">
+      <h3>${p.title}</h3>
+      <div class="meta">${p.cat} · ${p.tags.join(' / ')}</div>
+      <div class="preview">${p.text.replace(/</g,'&lt;')}</div>
+      <button class="copy-btn" onclick="copy('${p.text.replace(/'/g,"\\'").replace(/\n/g,'\\n')}')">📋 复制提示词</button>
+    </div>
+  `).join('');
+}
+
+function copy(text){
+  navigator.clipboard.writeText(text).then(()=>{
+    const btn = event.target;
+    btn.textContent = '✅ 已复制！';
+    setTimeout(()=>btn.textContent='📋 复制提示词',1500);
+  });
+}
+
+renderTags();
+render(prompts);
+</script>
+</body>
+</html>
